@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="RemoteTargetsManager">
+    <targets>
+      <target name="backend" type="docker-compose" uuid="e2d52173-da71-4fdd-98db-6d1452cab0c2">
+        <config>
+          <option name="targetPlatform">
+            <TargetPlatform />
+          </option>
+          <option name="configurationFiles">
+            <list>
+              <option value="C:\wsl\UbuntuDevUAB\projeto-uab\docker-compose.yml" />
+            </list>
+          </option>
+          <option name="serviceName" value="backend" />
+        </config>
+        <ContributedStateBase type="JavaLanguageRuntime">
+          <config>
+            <option name="homePath" value="/usr/lib/jvm/java-21" />
+            <option name="javaVersionString" value="27" />
+          </config>
+        </ContributedStateBase>
+      </target>
+    </targets>
+  </component>
+</project>
