@@ -29,6 +29,13 @@
         </dependencies>
     </dependencyManagement>
 
+    <repositories>
+        <repository>
+            <id>local-jrimum-repo</id>
+            <url>file://${project.basedir}/local-maven-repo</url>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>io.quarkus</groupId>
@@ -53,6 +60,26 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-arc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jrimum</groupId>
+            <artifactId>jrimum</artifactId>
+            <version>0.2.0-local</version>
+        </dependency>
+        <dependency>
+            <groupId>commons-lang</groupId>
+            <artifactId>commons-lang</artifactId>
+            <version>2.4</version>
+        </dependency>
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+            <version>1.2.16</version>
+        </dependency>
+        <dependency>
+            <groupId>com.lowagie</groupId>
+            <artifactId>itext</artifactId>
+            <version>2.1.7</version>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>

@@ -19,6 +19,12 @@ export class BoletoService {
     return this.http.post<any>(this.apiUrl, boleto);
   }
 
+  baixarPdf(id: number): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/${id}/pdf`, {
+      responseType: 'blob'
+    });
+  }
+
   pdfUrl(id: number): string {
     return `${this.apiUrl}/${id}/pdf`;
   }

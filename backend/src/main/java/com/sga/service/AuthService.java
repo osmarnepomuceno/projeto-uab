@@ -17,7 +17,7 @@ import java.util.HashSet;
 public class AuthService {
 
     public AuthResponseDto login(LoginDto loginDto) {
-        UsuarioModel usuario = UsuarioModel.find("email", loginDto.email).firstResult();
+         UsuarioModel usuario = UsuarioModel.find("email", loginDto.email).firstResult();
 
         if (usuario != null && BcryptUtil.matches(loginDto.password, usuario.senhaHash)) {
             long expiresAt = Instant.now().plus(Duration.ofHours(8)).getEpochSecond();

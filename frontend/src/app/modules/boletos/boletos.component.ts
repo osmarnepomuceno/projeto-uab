@@ -63,7 +63,7 @@ import { BoletoService } from './boleto.service';
                 <td>{{ boleto.valor | currency:'BRL' }}</td>
                 <td>{{ boleto.dataVencimento }}</td>
                 <td><span class="status">{{ boleto.status }}</span></td>
-                <td><a class="link-button" [href]="boletoService.pdfUrl(boleto.id)" target="_blank">PDF</a></td>
+                <td><button type="button" class="link-button" (click)="abrirPdf(boleto.id)">PDF</button></td>
               </tr>
             } @empty {
               <tr>
@@ -92,7 +92,7 @@ import { BoletoService } from './boleto.service';
     th { background-color: #f8fafc; font-weight: 700; color: #475467; }
     .status { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #fff7ed; color: #b54708; font-size: 12px; font-weight: 700; }
     .empty { text-align: center; color: #667085; }
-    .link-button { color: #175cd3; font-weight: 700; text-decoration: none; }
+    .link-button { height: auto; border: 0; background: transparent; color: #175cd3; font-weight: 700; text-decoration: none; padding: 0; cursor: pointer; }
     @media (max-width: 980px) { .form-grid { grid-template-columns: 1fr; } }
   `]
 })
@@ -138,6 +138,18 @@ export class BoletosComponent implements OnInit {
         this.carregarBoletos();
       },
       error: () => this.mensagem.set('Nao foi possivel gerar o boleto.')
+    });
+  }
+
+  abrirPdf(id: number) {
+    this.boletoService.baixarPdf(id).subscribe({
+      next: (pdf) => {
+        const pdfUrl = URL.createObjectURL(pdf);
+        window.open(pdfUrl, '_blank');
+      },
+      error: () => {
+        this.mensagem.set('Nao foi possivel abrir o PDF do boleto.');
+      }
     });
   }
 }
