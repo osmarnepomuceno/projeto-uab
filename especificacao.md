@@ -212,3 +212,79 @@ CLASS AssociadoService
         RETURN HttpClient.delete(apiUrl + '/' + associadoId)
 
 ```
+
+### 4.8 Backend - Otimizacao de Boleto PDF
+
+`/backend/src/main/java/com/sga/service/BoletoStorageService.java`
+
+* **acao:** atualizar
+* **descricao:** Centraliza armazenamento temporario de boletos PDF, normaliza nomes de arquivos e permite leitura de PDF ja gerado em cache.
+* **pseudocodigo:**
+
+```java
+CLASS BoletoStorageService
+    METHOD resolvePdf(fileName: String): Path
+        safeFileName = normalizarNomePdf(fileName)
+        resolvedPath = boletoTmpPath.resolve(safeFileName).normalize()
+        IF resolvedPath NOT startsWith boletoTmpPath:
+            THROW IllegalArgumentException
+        RETURN resolvedPath
+
+    METHOD readCachedPdf(fileName: String): Optional<byte[]>
+        pdfPath = resolvePdf(fileName)
+        IF pdfPath NAO EXISTE:
+            RETURN Optional.empty()
+        RETURN Optional.of(readAllBytes(pdfPath))
+```
+
+`/backend/src/main/java/com/sga/service/BoletoPdfJobQueue.java`
+
+* **acao:** criar
+* **descricao:** Fila local e controlada para jobs de geracao de PDF de boletos. Deduplica geracoes concorrentes do mesmo boleto e executa a rotina pesada em um worker unico.
+* **pseudocodigo:**
+
+```java
+@ApplicationScoped
+CLASS BoletoPdfJobQueue
+    executor = singleThreadExecutor
+    jobs = ConcurrentHashMap<Integer, Future<byte[]>>
+
+    METHOD execute(boletoId: Integer, job: Callable<byte[]>): byte[]
+        future = jobs.computeIfAbsent(boletoId, executor.submit(job))
+        TRY:
+            RETURN future.get()
+        FINALLY:
+            jobs.remove(boletoId, future)
+```
+
+`/backend/src/main/java/com/sga/service/BoletoService.java`
+
+* **acao:** atualizar
+* **descricao:** Mantem o contrato de download de PDF, mas passa a consultar cache antes da geracao e envia a montagem do PDF para a fila quando o arquivo ainda nao existe.
+* **pseudocodigo:**
+
+```java
+CLASS BoletoService
+    DEPENDENCIES: BoletoStorageService, BoletoPdfJobQueue
+
+    METHOD gerarPdf(boletoId: Integer): byte[]
+        cachedPdf = BoletoStorageService.readCachedPdf("boleto-" + boletoId)
+        IF cachedPdf PRESENT:
+            RETURN cachedPdf
+
+        RETURN BoletoPdfJobQueue.execute(boletoId, () -> gerarPdfSemCache(carregarDadosPdf(boletoId)))
+
+    METHOD gerarPdfSemCache(dadosPdf: BoletoPdfData): byte[]
+        boleto = criarBoleto(dadosPdf)
+        boletoPath = BoletoStorageService.resolvePdf("boleto-" + dadosPdf.boletoId)
+        BoletoViewer.writePdf(boletoPath)
+        RETURN BoletoStorageService.readPdf(boletoPath)
+```
+
+### 4.9 Frontend - Estilos Compartilhados
+
+`/frontend/src/styles.css`
+
+* **acao:** atualizar
+* **descricao:** Centraliza estilos repetidos de paginas, paineis, formularios, tabelas, mensagens, status e botoes de acao usados nos componentes de associados, usuarios e boletos.
+* **criterio:** componentes devem manter apenas estilos especificos de layout local, como colunas de formulario e cores particulares de status.

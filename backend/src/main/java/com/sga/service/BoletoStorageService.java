@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 
 @ApplicationScoped
 public class BoletoStorageService {
@@ -44,7 +45,40 @@ public class BoletoStorageService {
     }
 
     public Path resolvePdf(String fileName) {
+        String safeFileName = normalizePdfFileName(fileName);
+        Path resolvedPath = boletoTmpPath.resolve(safeFileName).normalize();
+
+        if (!resolvedPath.startsWith(boletoTmpPath)) {
+            throw new IllegalArgumentException("Nome de arquivo de boleto invalido: " + fileName);
+        }
+
+        return resolvedPath;
+    }
+
+    public Optional<byte[]> readCachedPdf(String fileName) {
+        Path pdfPath = resolvePdf(fileName);
+
+        if (!Files.isRegularFile(pdfPath)) {
+            return Optional.empty();
+        }
+
+        try {
+            return Optional.of(Files.readAllBytes(pdfPath));
+        } catch (IOException e) {
+            throw new IllegalStateException("Nao foi possivel ler boleto em cache: " + pdfPath, e);
+        }
+    }
+
+    public byte[] readPdf(Path pdfPath) {
+        try {
+            return Files.readAllBytes(pdfPath);
+        } catch (IOException e) {
+            throw new IllegalStateException("Nao foi possivel ler boleto PDF gerado em: " + pdfPath, e);
+        }
+    }
+
+    private String normalizePdfFileName(String fileName) {
         String safeFileName = fileName.endsWith(".pdf") ? fileName : fileName + ".pdf";
-        return boletoTmpPath.resolve(safeFileName).normalize();
+        return Path.of(safeFileName).getFileName().toString();
     }
 }

@@ -1,8 +1,7 @@
 package com.sga.service;
 
-import com.sga.model.BoletoModel;
 import com.sga.model.AssociadoModel;
-import com.sga.model.EmpresaModel;
+import com.sga.model.BoletoModel;
 import com.sga.utils.CampoLivreCefSIGCB;
 import com.sga.utils.UtilitarioString;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -12,15 +11,24 @@ import org.jrimum.bopepo.BancosSuportados;
 import org.jrimum.bopepo.Boleto;
 import org.jrimum.bopepo.view.BoletoViewer;
 import org.jrimum.domkee.financeiro.banco.ParametrosBancariosMap;
-import org.jrimum.domkee.financeiro.banco.febraban.*;
+import org.jrimum.domkee.financeiro.banco.febraban.Agencia;
+import org.jrimum.domkee.financeiro.banco.febraban.Carteira;
+import org.jrimum.domkee.financeiro.banco.febraban.Cedente;
+import org.jrimum.domkee.financeiro.banco.febraban.ContaBancaria;
+import org.jrimum.domkee.financeiro.banco.febraban.NumeroDaConta;
+import org.jrimum.domkee.financeiro.banco.febraban.Sacado;
+import org.jrimum.domkee.financeiro.banco.febraban.TipoDeCobranca;
+import org.jrimum.domkee.financeiro.banco.febraban.TipoDeTitulo;
+import org.jrimum.domkee.financeiro.banco.febraban.Titulo;
 import org.jrimum.utilix.text.Field;
 import org.jrimum.utilix.text.Filler;
-import java.io.IOException;
+
+import java.io.File;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.io.File;
-
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Calendar;
 import java.util.Date;
@@ -29,16 +37,18 @@ import java.util.List;
 @ApplicationScoped
 public class BoletoService {
 
-   private static final String CONTA = "047829";
-   private static final String AGENCIA = "2525";
-   private static final String ASSOCIACAO = "Associação Teste";
-   private static final String CNPJ = "07.969.101/0001-14";
-   private static final String DV_CONTA = "6";
-   private static final String ENDERECO = "Rua Fulano de Tal, Numero 25, Palmas-TO CEP:77.000-000";
+    private static final String CONTA = "047829";
+    private static final String AGENCIA = "2525";
+    private static final String ASSOCIACAO = "Associacao Teste";
+    private static final String CNPJ = "07.969.101/0001-14";
+    private static final String DV_CONTA = "6";
+    private static final String ENDERECO = "Rua Fulano de Tal, Numero 25, Palmas-TO CEP:77.000-000";
 
     @Inject
     BoletoStorageService boletoStorageService;
 
+    @Inject
+    BoletoPdfJobQueue boletoPdfJobQueue;
 
     public List<BoletoModel> listarPorAssociado(Integer associadoId) {
         return BoletoModel.find("associado.id", associadoId).list();
@@ -51,123 +61,116 @@ public class BoletoService {
     }
 
     public byte[] gerarPdf(Integer boletoId) {
+        return boletoStorageService.readCachedPdf(pdfFileName(boletoId))
+                .orElseGet(() -> boletoPdfJobQueue.execute(boletoId, () -> gerarPdfSemCache(carregarDadosPdf(boletoId))));
+    }
+
+    private BoletoPdfData carregarDadosPdf(Integer boletoId) {
         BoletoModel boletoModel = BoletoModel.findById(boletoId);
         if (boletoModel == null) {
-            throw new RuntimeException("Boleto não encontrado");
+            throw new RuntimeException("Boleto nao encontrado");
         }
+
         AssociadoModel associadoModel = boletoModel.associado;
         if (associadoModel == null) {
             throw new RuntimeException("Associado do boleto nao encontrado");
         }
-        Boleto boleto = null;
 
-        // Cedente ******************************************************
-        Cedente cedente = new Cedente(ASSOCIACAO, CNPJ);
-        // Sacado ******************************************************
-        Sacado sacado = new Sacado(associadoModel.nome, associadoModel.cpf);
+        return new BoletoPdfData(
+                boletoModel.id,
+                boletoModel.valor,
+                boletoModel.dataVencimento,
+                associadoModel.nome,
+                associadoModel.cpf
+        );
+    }
 
-        BancosSuportados bancosSuportados = BancosSuportados.CAIXA_ECONOMICA_FEDERAL;
-        if (bancosSuportados == null) {
-            throw new RuntimeException("Banco nao Suportado");
-        }
-
-        ContaBancaria contaBancaria = new ContaBancaria(bancosSuportados.create());
-        contaBancaria.setNumeroDaConta(new NumeroDaConta(Integer.parseInt(CONTA)));
-        contaBancaria.setCarteira(new Carteira( 1, TipoDeCobranca.SEM_REGISTRO, "SR"));
-
-        contaBancaria.setAgencia(new Agencia(Integer.parseInt(AGENCIA)));
-
-        Titulo titulo = new Titulo(contaBancaria, sacado, cedente);
-        titulo.setNumeroDoDocumento(geraNumeroDocumento(boletoId));
-
-        ParametrosBancariosMap parametrosBancariosMap = new ParametrosBancariosMap();
-
-        titulo.setDataDoDocumento(new Date());
-        titulo.setDataDoVencimento(Date.from(
-                boletoModel.dataVencimento.minusYears(2).atStartOfDay(ZoneId.systemDefault()).toInstant()));
-
-        titulo.setValor(boletoModel.valor);
-        titulo.setTipoDeDocumento(TipoDeTitulo.OUTROS);
-
-        titulo.setNossoNumero(geraNossoNumeroSIGCBCaixa(boletoModel.id));
-        titulo.setDigitoDoNossoNumero(UtilitarioString.calculaDVModulo11(titulo.getNossoNumero()) + "");
-        CampoLivreCefSIGCB campoLivreCefSIGCB = new CampoLivreCefSIGCB(CONTA,DV_CONTA, titulo.getNossoNumero() + "");
-        titulo.setParametrosBancarios(parametrosBancariosMap);
-        boleto = new Boleto(titulo, campoLivreCefSIGCB);
-
-        boleto.addTextosExtras("txtFcAgenciaCodigoCedente", AGENCIA + "/" + CONTA + "-" + DV_CONTA);
-        boleto.addTextosExtras("txtRsAgenciaCodigoCedente", AGENCIA + "/" + CONTA + "-" + DV_CONTA);
-        boleto.addTextosExtras("txtFcAceite", "N");
-        boleto.setLocalPagamento("Pagável preferencialmente em qualquer banco até a data de vencimento.");
-        boleto.addTextosExtras("txtRsInstituicao", ASSOCIACAO);
-        boleto.addTextosExtras("txtFcCedenteEndereco", ENDERECO);
-        boleto.addTextosExtras("txtRcCedenteEndereco",ENDERECO);
-        boleto.addTextosExtras("txtRsEndereco", ENDERECO);
-        boleto.addTextosExtras("txtRsSacado", associadoModel.nome);
-
-        boleto.addTextosExtras("txtRsEndereco2", "CNPJ: " + CNPJ + " - FONE: 3232-3232 ");
-
-        boleto.addTextosExtras("txtFcCpfCnpj", CNPJ);
-
-        boleto.addTextosExtras("txtFcEspecie","R$");
-
-        boleto.addTextosExtras("txtFcSacadoL1", associadoModel.nome);
-        boleto.addTextosExtras("txtFcSacadoCpfCnpj", associadoModel.cpf);
-        boleto.addTextosExtras("txtRsSacadoCpfCnpj", associadoModel.cpf);
-
-        boleto.addTextosExtras("txtFcSacadoL2", ENDERECO);
-
-        File template =getTemplateFile();
+    private byte[] gerarPdfSemCache(BoletoPdfData dadosPdf) {
+        Boleto boleto = criarBoleto(dadosPdf);
 
         BoletoViewer boletoViewer = new BoletoViewer(boleto);
-        boletoViewer.setTemplate(template);
+        boletoViewer.setTemplate(getTemplateFile());
 
-        Path boletoPath = boletoStorageService.resolvePdf("boleto-" + boletoId);
-
-
+        Path boletoPath = boletoStorageService.resolvePdf(pdfFileName(dadosPdf.boletoId()));
         boletoViewer.getPdfAsFile(boletoPath.toString());
 
+        return boletoStorageService.readPdf(boletoPath);
+    }
 
+    private Boleto criarBoleto(BoletoPdfData dadosPdf) {
+        Cedente cedente = new Cedente(ASSOCIACAO, CNPJ);
+        Sacado sacado = new Sacado(dadosPdf.associadoNome(), dadosPdf.associadoCpf());
+        Titulo titulo = criarTitulo(dadosPdf, cedente, sacado);
+        CampoLivreCefSIGCB campoLivre = new CampoLivreCefSIGCB(CONTA, DV_CONTA, titulo.getNossoNumero() + "");
+        Boleto boleto = new Boleto(titulo, campoLivre);
 
+        preencherTextosExtras(boleto, dadosPdf);
+        return boleto;
+    }
 
+    private Titulo criarTitulo(BoletoPdfData dadosPdf, Cedente cedente, Sacado sacado) {
+        ContaBancaria contaBancaria = criarContaBancaria();
+        Titulo titulo = new Titulo(contaBancaria, sacado, cedente);
 
+        titulo.setNumeroDoDocumento(geraNumeroDocumento(dadosPdf.boletoId()));
+        titulo.setDataDoDocumento(new Date());
+        titulo.setDataDoVencimento(Date.from(
+                dadosPdf.dataVencimento().minusYears(2).atStartOfDay(ZoneId.systemDefault()).toInstant()));
+        titulo.setValor(dadosPdf.valor());
+        titulo.setTipoDeDocumento(TipoDeTitulo.OUTROS);
+        titulo.setNossoNumero(geraNossoNumeroSIGCBCaixa(dadosPdf.boletoId()));
+        titulo.setDigitoDoNossoNumero(UtilitarioString.calculaDVModulo11(titulo.getNossoNumero()) + "");
+        titulo.setParametrosBancarios(new ParametrosBancariosMap());
 
+        return titulo;
+    }
 
-        try {
-            return Files.readAllBytes(boletoPath);
-        } catch (IOException e) {
-            throw new RuntimeException("Erro ao ler boleto PDF gerado em: " + boletoPath, e);
-        }
+    private ContaBancaria criarContaBancaria() {
+        BancosSuportados banco = BancosSuportados.CAIXA_ECONOMICA_FEDERAL;
+        ContaBancaria contaBancaria = new ContaBancaria(banco.create());
+        contaBancaria.setNumeroDaConta(new NumeroDaConta(Integer.parseInt(CONTA)));
+        contaBancaria.setCarteira(new Carteira(1, TipoDeCobranca.SEM_REGISTRO, "SR"));
+        contaBancaria.setAgencia(new Agencia(Integer.parseInt(AGENCIA)));
+        return contaBancaria;
+    }
+
+    private void preencherTextosExtras(Boleto boleto, BoletoPdfData dadosPdf) {
+        String agenciaConta = AGENCIA + "/" + CONTA + "-" + DV_CONTA;
+
+        boleto.addTextosExtras("txtFcAgenciaCodigoCedente", agenciaConta);
+        boleto.addTextosExtras("txtRsAgenciaCodigoCedente", agenciaConta);
+        boleto.addTextosExtras("txtFcAceite", "N");
+        boleto.setLocalPagamento("Pagavel preferencialmente em qualquer banco ate a data de vencimento.");
+        boleto.addTextosExtras("txtRsInstituicao", ASSOCIACAO);
+        boleto.addTextosExtras("txtFcCedenteEndereco", ENDERECO);
+        boleto.addTextosExtras("txtRcCedenteEndereco", ENDERECO);
+        boleto.addTextosExtras("txtRsEndereco", ENDERECO);
+        boleto.addTextosExtras("txtRsSacado", dadosPdf.associadoNome());
+        boleto.addTextosExtras("txtRsEndereco2", "CNPJ: " + CNPJ + " - FONE: 3232-3232 ");
+        boleto.addTextosExtras("txtFcCpfCnpj", CNPJ);
+        boleto.addTextosExtras("txtFcEspecie", "R$");
+        boleto.addTextosExtras("txtFcSacadoL1", dadosPdf.associadoNome());
+        boleto.addTextosExtras("txtFcSacadoCpfCnpj", dadosPdf.associadoCpf());
+        boleto.addTextosExtras("txtRsSacadoCpfCnpj", dadosPdf.associadoCpf());
+        boleto.addTextosExtras("txtFcSacadoL2", ENDERECO);
     }
 
     public static String geraNumeroDocumento(Integer idTipoGuia) {
-
-        String numeroDoc;
-
         @SuppressWarnings("deprecation")
         Date dataBase = new Date("01/01/2012");
         Date dataAtual = Calendar.getInstance().getTime();
         long timeDiff = dataAtual.getTime() - dataBase.getTime();
-        int dias = 0;
-        double temp;
+        double temp = timeDiff / 1000;
+        temp /= 60;
+        temp /= 60;
+        int dias = (int) (temp / 24);
 
-        temp = timeDiff / 1000; // Convertendo Segundos;
-        temp /= 60; // Convertendo Minutos;
-        temp /= 60; // Convertendo Hora;
-        dias = (int) (temp / 24); // Convertendo Dia;
-
-        numeroDoc = new Field<String>(idTipoGuia + "", 5, Filler.ZERO_LEFT).write() + new Field<String>(dias + "", 4, Filler.ZERO_LEFT).write();
-
-        return numeroDoc;
-
+        return new Field<String>(idTipoGuia + "", 5, Filler.ZERO_LEFT).write()
+                + new Field<String>(dias + "", 4, Filler.ZERO_LEFT).write();
     }
 
     public static String geraNossoNumeroSIGCBCaixa(Integer idGuia) {
-
-        String nossoNumero = null;
-        nossoNumero = "24" + new Field<String>(idGuia + "", 15, Filler.ZERO_LEFT).write();
-        return nossoNumero;
-
+        return "24" + new Field<String>(idGuia + "", 15, Filler.ZERO_LEFT).write();
     }
 
     public File getTemplateFile() {
@@ -186,6 +189,18 @@ public class BoletoService {
         } catch (Exception e) {
             throw new RuntimeException("Erro ao carregar template PDF.", e);
         }
+    }
 
+    private String pdfFileName(Integer boletoId) {
+        return "boleto-" + boletoId;
+    }
+
+    private record BoletoPdfData(
+            Integer boletoId,
+            BigDecimal valor,
+            LocalDate dataVencimento,
+            String associadoNome,
+            String associadoCpf
+    ) {
     }
 }

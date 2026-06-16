@@ -62,3 +62,26 @@ O frontend estará disponível em `http://localhost:4200`.
 - **Backend:** Quarkus (Java 17), Hibernate ORM (Panache), RESTEasy Reactive, SmallRye JWT.
 - **Frontend:** Angular 19+, TypeScript, SSR/SSG habilitados.
 - **Banco de Dados:** MySQL 8.0.
+
+## Otimizacoes Implementadas
+
+- A geracao de PDF de boletos consulta cache em disco antes de acionar a biblioteca JRimum/Bopepo.
+- Jobs de geracao de PDF passam por uma fila local single-worker, com deduplicacao por boleto para evitar geracoes concorrentes duplicadas.
+- O armazenamento temporario de boletos normaliza nomes de arquivo e restringe os PDFs ao diretorio configurado por `sga.boletos.tmp-dir`.
+- Estilos repetidos das telas Angular foram centralizados em `frontend/src/styles.css`.
+
+## Testes E Build
+
+Backend:
+```bash
+cd backend
+./mvnw.cmd test
+```
+
+Frontend:
+```bash
+cd frontend
+npm run build
+```
+
+Observacao: o comando `npm test -- --watch=false --browsers=ChromeHeadless` ainda depende da configuracao do target de testes Angular/Karma no `angular.json`.

@@ -368,3 +368,41 @@ Este plano esta adequado para iniciar a estrategia TDD First do projeto. As melh
 - Priorizacao de RBAC, JWT, senha BCrypt e contratos REST.
 - Inclusao de estrategia de automacao local e CI.
 - Definicao da ordem recomendada de implementacao TDD.
+
+## 12. Fluxos De Otimizacao Cobertos
+
+Novos cenarios adicionados ao plano:
+
+| Funcionalidade | Tipo | Prioridade | Cenario Critico | Resultado Esperado |
+|---|---|---:|---|---|
+| Cache de boleto PDF | Unitario | Alta | PDF ja existe no diretorio temporario | Bytes sao retornados sem nova geracao |
+| Fila de boleto PDF | Unitario | Alta | Duas requisicoes concorrentes para o mesmo boleto | Apenas um job gera o PDF e ambas recebem bytes |
+| Storage de boleto PDF | Unitario | Alta | Nome de arquivo com travessia de diretorio | Caminho e normalizado dentro do diretorio temporario |
+| Estilos compartilhados Angular | Build | Media | Componentes usam CSS global comum | `npm run build` compila sem regressao |
+
+Testes automatizados implementados no backend:
+
+- `BoletoStorageServiceTest.deveResolverPdfDentroDoDiretorioConfigurado`
+- `BoletoStorageServiceTest.deveLerPdfEmCacheQuandoArquivoExistir`
+- `BoletoStorageServiceTest.deveNormalizarNomeComTentativaDeTravessiaDeDiretorio`
+- `BoletoPdfJobQueueTest.deveExecutarJobEDevolverBytesGerados`
+- `BoletoPdfJobQueueTest.deveDeduplicarJobsConcorrentesParaMesmoBoleto`
+
+Criterios de aceite especificos:
+
+- Geracao de PDF deve consultar cache antes de acionar a biblioteca de boleto.
+- Jobs concorrentes do mesmo boleto devem compartilhar a mesma execucao.
+- Arquivos de PDF devem permanecer dentro de `sga.boletos.tmp-dir`.
+- Componentes Angular devem manter apenas estilos especificos apos a centralizacao do CSS comum.
+
+Comandos executados apos as etapas de refatoracao:
+
+```bash
+cd backend
+./mvnw.cmd test
+
+cd frontend
+npm run build
+```
+
+Observacao atual: `npm test -- --watch=false --browsers=ChromeHeadless` foi executado e falhou com `Unknown arguments: watch, browsers`. Ate que o target de testes Angular/Karma seja configurado no `angular.json`, a verificacao automatizada disponivel para frontend e `npm run build`.

@@ -77,23 +77,8 @@ import { UsuarioService } from './usuario.service';
     </section>
   `,
   styles: [`
-    .page-header { margin-bottom: 18px; }
-    h1 { margin: 0; font-size: 28px; color: #17212f; }
-    h2 { margin: 0 0 16px; font-size: 18px; color: #17212f; }
-    p { margin: 6px 0 0; color: #667085; }
-    .panel { background: #fff; border: 1px solid #e1e7ef; border-radius: 8px; padding: 18px; margin-bottom: 18px; }
-    .form-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto; gap: 12px; align-items: end; }
-    label { display: grid; gap: 6px; color: #344054; font-size: 13px; font-weight: 600; }
-    input, select { height: 40px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0 10px; font-size: 14px; }
-    button { height: 40px; border: 0; border-radius: 6px; padding: 0 14px; background: #2f80ed; color: #fff; cursor: pointer; font-weight: 700; }
-    .message { color: #0f766e; font-weight: 600; margin-top: 12px; }
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 760px; }
-    th, td { border-bottom: 1px solid #e9eef5; padding: 12px; text-align: left; }
-    th { background-color: #f8fafc; font-weight: 700; color: #475467; }
-    .empty { text-align: center; color: #667085; }
-    .link-button { height: auto; background: transparent; color: #175cd3; padding: 0; }
-    .danger { color: #b42318; }
+    .form-grid { grid-template-columns: repeat(4, minmax(0, 1fr)) auto; }
+    table { min-width: 760px; }
     @media (max-width: 980px) { .form-grid { grid-template-columns: 1fr; } }
   `]
 })
